@@ -1,0 +1,539 @@
+---
+title: "Global Landslide Catalog Analysis"
+author: "Shailja Kartik"
+date: "December 06, 2021"
+output:
+  html_document: default
+  pdf_document: default
+  word_document: default
+---
+
+# Introduction
+
+The dataset we are using for my Final Project is the **"Global Landslide Catalog Export"** dataset obtained from NASA's Open Data Portal.
+
+A summary of the dataset is available at:
+https://data.nasa.gov/Earth-Science/Global-Landslide-Catalog-Export/dd9e-wu2v
+
+The downloadable version of the dataset in the CSV format is from: 
+https://catalog.data.gov/dataset/global-landslide-catalog-export
+
+To learn more about NASA's work on the landslide, please visit the homepage: https://gpm.nasa.gov/landslides/index.html
+
+# Motivation behind using the Global Landslide Catalog Export (GLC)
+
+Landslides cause billions of dollars in infrastructural damage and thousands of deaths worldwide.
+Data on past landslide events guides future disaster prevention, but we do not have a global picture of exactly when and where landslides occur.
+
+NASA scientists have been building an open global inventory of landslides to address this problem. 
+Knowing where and when landslides occur can help communities worldwide prepare for these disasters. 
+
+Through this project, we would welcome an opportunity to help make an informed decision that could save lives and property
+
+# About the dataset
+
+The Global Landslide Catalog (GLC) has been compiled since 2007 at NASA Goddard Space Flight Center.\
+The GLC is a collection of **observational studies**. \
+The GLC was developed to identify rainfall-triggered landslide events worldwide, regardless of size, impact, or location. \
+The GLC considers all types of mass movements triggered by rainfall, which have been reported in the media, disaster databases, scientific reports, or other sources.
+
+The dataset contains **31** Attributes and has **11033** observations.\
+Each observation is a **Landslide**.
+
+The list of all the Variables which are available for us to explore along with their types are listed below:\
+
+```{r include=FALSE}
+Attributes <- c("source_name", "source_link", "event_id", "event_date", "event_time", "event_title", 
+                "event_description", "location_description", "location_accuracy", "landslide_category", "landslide_trigger", 
+                "landslide_size", "landslide_setting", "fatality_count", "injury_count", "storm_name", "photo_link", "notes", 
+                "event_import_source", "event_import_id", "country_name", "country_code", "admin_division_name", 
+                "admin_division_population", "gazeteer_closest_point", "gazeteer_distance", "submitted_date", "created_date",
+                "last_edited_date", "longitude", "latitude")
+Types <- c("Text", "Website URL", "Number", "Date & Time", "Date & Time", "Text", "Text", "Text", "Text", "Text", "Text", "Text",
+                 "Text", "Number", "Number", "Text", "Website URL", "Text", "Text", "Number", "Text", "Text", "Text", "Number", "Text",
+                 "Number", "Date & Time", "Date & Time", "Date & Time", "Number", "Number")
+attributes <- data.frame(Attributes, Types)
+```
+
+```{r}
+knitr::kable(attributes, "simple", col.names = c("Attribute Names", "Attribute Type"), align = c("l", "c"), caption = "Variables of the Dataset and their Types")
+```
+
+However,we will be focusing only on the below Variables for my Project Analysis:
+
+
+```{r include=FALSE}
+Attributes_interest <- c("source_name", "event_id", "event_date", "event_time", "event_title", 
+                "event_description", "location_description", "location_accuracy", "landslide_category", "landslide_trigger", 
+                "landslide_size", "fatality_count", "injury_count", "storm_name", "country_name", "country_code", "admin_division_name", 
+                "admin_division_population", "longitude", "latitude")
+Types_interest <- c("Text","Number","Date & Time","Date & Time","Text","Text","Text","Text","Text","Text","Text","Number","Number","Text",
+                    "Text","Text","Text","Number","Number","Number")
+attributes_interest <- data.frame(Attributes_interest, Types_interest)
+```
+
+```{r}
+knitr::kable(attributes_interest, "simple", col.names = c("Variable Names", "Variable Type"), align = c("l", "c"), caption = "Variables of the Dataset we will explore")
+```
+
+# Goal
+
+Through the below data analysis, we want to answer these questions:
+
+1. How many people were killed in the largest landslide ever recorded?
+2. Are the sizes of various landslides equally distributed in the dataset?
+3. What are the countries with more than 50 injured recorded in any landslide?
+4. Is there any correlation between the numerical variable?
+5. Perform hypothesis testing to see if the mean of the fatality_count of any two countries with the same number of landslides will be the same or not
+6. Use Logistic Regression to predict the size of the landslide
+
+# Analysis
+
+## Loading the Package and Data
+
+The first step is to load the necessary library, which contains all the datasets
+
+If the package is not installed, please uncomment the below line of R code and execute it on your machine.
+The below statement installs the pre-requisite package
+```{r results = 'hide'}
+#install.packages("tidyverse")
+#install.packages("ggplot2")
+#install.packages("maps")
+```
+
+
+Now that the package is installed, we need to load the required library
+```{r results = 'hide'}
+# Loading required libraries #
+library(tidyverse)
+library(ggplot2)
+
+```
+
+
+In the next step, we will create a local object that will hold our dataset.
+
+The name of our local object will be "globalLandslide_data".
+```{r}
+globalLandslide_data <- as_tibble(read.csv("D:\\SJSU\\1stSem\\Study\\ISE-201\\Submissions\\ProjectProposal-2\\originaldataset\\Global_Landslide_Catalog_Export.csv"))
+```
+
+## Examining the Data
+
+This section will use some basic steps to examine our data.
+Here we will also see if any changes are required in our dataset to make our work easy and smooth.
+
+This stage can also be referred to as **"Cleaning the Data."**
+
+### 1. Evaluating the structure of the data
+```{r}
+str(globalLandslide_data)
+```
+
+The output of the above query tells us the structure of the dataset.
+
+We have a data frame with 11,033 observations on 31 variables.
+And the dataset is a mix of categorical, nominal, numerical, and continuous variables.
+ 
+
+### 2. Peeking at the data
+
+
+Looking at the first few observations in the dataframe
+
+```{r}
+head(globalLandslide_data)
+```
+
+
+Looking at the last few observations in the dataset
+```{r}
+tail(globalLandslide_data)
+```
+
+### 3. Checking the summary of the Tibble
+
+```{r}
+summary(globalLandslide_data)
+```
+## Quality Check and Data Cleaning
+
+In this section, we will be checking the quality of our data and cleaning our dataset, if required.\
+
+### 1. Checking the Variable Name
+
+```{r}
+# Checking the names of the Columns 
+names(globalLandslide_data)
+```
+
+Our variable names are meaningful, which is great. 
+In addition, the clear variable names help us know the feature we are working on.
+
+### 2. Removing the Columns which we are not including in our analysis
+
+Let us remove the columns which we are not going to focus on for our further analysis:
+
+```{r}
+globalLandslide_df <- globalLandslide_data[!(colnames(globalLandslide_data) %in% c("source_link", "landslide_setting", "photo_link", "notes", 
+                "event_import_source", "event_import_id", "gazeteer_closest_point", "gazeteer_distance", "submitted_date", "created_date",
+                "last_edited_date"))]
+```
+
+
+Looking at the structure of the dataframe we will be proceeding with:
+
+```{r}
+str(globalLandslide_df)
+```
+
+We will be proceeding with globalLandslide_df, which has **11,033 observations on 20 variables.**
+
+### 3. Checking for missing data
+
+```{r}
+# Calculate the total numbers of "Not Available" data 
+sum(is.na(globalLandslide_df))
+```
+There are many cells with missing data in our dataset.
+Let's see which columns do not have data in them
+
+```{r}
+names(which(colSums(is.na(globalLandslide_df)) > 0))
+```
+
+### 4. Handling Missing Data
+
+Let us address the above columns with missing data one-by-one
+
+```{r}
+# Handling missing data in "injury_count" column
+globalLandslide_df$injury_count[is.na(globalLandslide_df$injury_count)] = 0
+
+# Handling missing data in "admin_division_population" column
+globalLandslide_df$admin_division_population[is.na(globalLandslide_df$admin_division_population)] = 0
+
+# Handling missing data in "fatality_count" column
+globalLandslide_df[!is.na(globalLandslide_df$fatality_count),]
+
+# Handling missing data for "country_name"
+globalLandslide_df <- globalLandslide_df[grep('^[A-Za-z]', globalLandslide_df$country_name),]
+```
+
+### 5. Checking for outliers
+
+To check if there are any outliers in our data-set, we will be using boxplots to easily view them.
+```{r, echo=FALSE,results='hide',fig.keep='all'}
+boxplot(globalLandslide_data$fatality_count,
+        main = "Checking the distribution of fatality_count values",
+        xlab = "Spread over the Landslides",
+        col = "orange",
+        border = "brown",
+        horizontal = TRUE,
+        notch = TRUE)$out
+```
+By looking at the above plot, we see that although the death count because of the Landslides over all the years was below 1000, there was one where the fatality count was 5000.\
+It must have been an enormous disaster.  
+
+Hence, this solves our 1st Question:
+**5000 people were killed in the largest landslide disaster ever recorded**
+
+## Data Transformation
+
+### 1. Separating the Event_Date to Date and Time
+
+We saw in the above section that one of the columns with missing value is "event_time".
+
+Let's check how many cells of the "event_time" are empty.
+
+```{r}
+sum(is.na(globalLandslide_df$event_time))
+```
+There is no data in the event_time variable as 11033 cells are empty.  
+
+This transformation step will get the time value from the "event_date" variable.\
+
+
+```{r}
+# Checking the values of the event_date column
+head(globalLandslide_df$event_date, 5)
+```
+
+By just checking the 5 records of the "event_date", we can say that it also contains the time.
+So, we will be using the Solution-2 in this Data Transformation Step
+
+Let's separate the time from the "event_date" and store it into the "event_time" column
+
+```{r}
+# Splitting the event_date by the first space
+ev_dates <- as.data.frame(str_split_fixed(globalLandslide_df$event_date, " ", 2))
+colnames(ev_dates) <- c("DATE", "TIME")
+head(ev_dates, 10)
+```
+
+Now storing the "TIME" column of y to our "event_time" and "DATE" column of y to our event_date
+```{r}
+globalLandslide_df$event_date <- ev_dates$DATE
+globalLandslide_df$event_time <- ev_dates$TIME
+```
+
+Now, let's check the missing data in the event_time
+
+```{r}
+sum(is.na(globalLandslide_df$event_time))
+```
+
+In the above step, we performed Data-Transformation for the "event_date" and "event_time" variable.  
+
+```{r}
+# Removing the landslide size which is 'unknown'
+globalLandslide_df <- globalLandslide_df[!grepl('unknown',globalLandslide_df$landslide_size),]
+```
+
+## Visual and Descriptive Analysis
+
+### 1. Analyzing single Categorical Variables 
+
+Now, let us start by analyzing our 2 Categorical Variables - "landslide_size" and "landslide_category."
+
+The below query returns a table of frequency occurrences of data in each "landslide_size" category
+
+```{r}
+table(globalLandslide_df$landslide_size)
+```
+We can see that our data is not equally distributed among the different sizes of landslides by the output. 
+And there are nine landslides whose size is not determined in our dataset.
+
+### Let's see this in a Visual format.
+
+```{r}
+# Create a bar graph of wool observations
+ggplot(data = globalLandslide_df) + 
+  geom_bar(mapping = aes(x = landslide_size))
+```
+
+The above bar graph clarifies that the highest number of landslides that occurred so far is **medium-sized.** The size of the maximum occurring landslides in our dataset is ** 2 categories of Wool are equally distributed in our dataset. There are nine landslides with no measure in our dataset.
+
+__This answers Question 2. No, the landslide sizes are not equally distributed in our dataset.__
+
+
+In the above plot, we can see that the number of very_large landslides is minimal.
+So, we can easily merge the large and very_large landslides as "large."
+
+```{r}
+globalLandslide_df$landslide_size[globalLandslide_df$landslide_size == "very_large"] <- "large"
+```
+
+### 2. Analyzing the spread of landslides based on the category
+
+Now, let us plot the landslide based on the category
+
+```{r}
+# Create a bar graph of wool observations
+
+p <- ggplot(data = globalLandslide_df) + 
+  geom_bar(mapping = aes(x = landslide_category))
+
+
+p + theme(axis.text.x = element_text(color="#993333", 
+                           size=10, angle=45),
+          axis.text.y = element_text(color="#993333", 
+                           size=10, angle=45))
+```
+
+From the above plot, we can see that most landslides are categorized as landslides. We also have significant mudslides and rock-fall types of landslides in our dataset.
+
+
+### 3. Analyzing the number of injuries
+
+```{r}
+# Create a boxplot of breaks
+boxplot(
+  x = globalLandslide_df$injury_count,
+  xlab = "Number of Injuries",
+  horizontal = TRUE,
+  main = "BoxPlot of Injury Count recorded on the Landslide dataset"
+)
+
+```
+The above Box Plot shows the spread of the injury count across our data frame 
+
+### 3. Plotting only those coutries with total injury more than 50 on a Pie Plot
+
+```{r}
+landslide_distribution <- globalLandslide_df %>% 
+  group_by(country_name) %>% 
+  summarise(sum_injuries = sum(injury_count)) %>% 
+  arrange(-sum_injuries)
+
+landslide_distribution
+```
+```{r}
+graph_data <- landslide_distribution[apply(landslide_distribution[,-1], 1, function(x) !all(x<=50)),]
+x <- c(graph_data$sum_injuries)
+yy <- c(graph_data$country_name)
+
+pie(x, yy, main = "Country pie chart with more than 50 Injuries", edges = 10) 
+
+```
+
+The above plot shows the countries which have more than 50 injury_count in any of the landslides.
+
+
+## Hypothesis testing
+
+In this section, we will move on to finding further answers to the hypothesis question listed above.
+
+Now, let's find out about the variables with character datatypes
+
+```{r}
+data_char<-globalLandslide_df %>% dplyr::select(where(is.character))
+
+for(i in colnames(data_char)){
+  print(unique(data_char[i]))
+}
+
+```
+
+
+### Studying correlation 
+
+In order to study the correlation in the dataset, let's take the numerical variables of importance
+```{r}
+numerical_data <- globalLandslide_df[, c('fatality_count', 'injury_count', 'longitude', 'latitude')] # Numerical variables
+
+# Removing na values
+numerical_data <- na.omit(numerical_data)
+```
+
+```{r}
+library(corrplot)
+library(RColorBrewer)
+corr <-cor(numerical_data)
+corrplot(corr, type="upper", order="hclust",
+         col=brewer.pal(n=8, name="RdYlBu"))
+```
+
+The above plot solves answers our Question-3. There is a very minimum correlation between the fatality_count and injury_count. However, the only correlation we can find is between latitude and longitude.
+
+
+### Hypothesis 1: Is the mean value of fatality_count in one country equal to the mean value of fatality_count of another country with the same number of landslide
+
+First, let's take the frequency table of the various countries
+
+```{r}
+country_tbl <- table(data_char$country_name)
+country_tbl <- sort(country_tbl, decreasing = T)
+country_tbl
+```
+Above is the frequency count of how many times a country had a landslide recorded.
+
+#### CASE-1
+
+Looking at the above distribution, we see that the 'Guatemala' and 'Japan' had same number of landslides
+Now, let's see if there is any relation between their fatality counts
+
+
+```{r}
+data_globalLandslide_Japan <- filter(globalLandslide_df,country_name== "Japan")
+data_globalLandslide_Guatemala <- filter(globalLandslide_df, country_name =="Guatemala")
+```
+
+Now, let's perform the T-Test
+
+```{r}
+(mean(data_globalLandslide_Japan$fatality_count,na.rm=TRUE))
+(mean(data_globalLandslide_Guatemala$fatality_count,na.rm=TRUE))
+
+(var(data_globalLandslide_Japan$fatality_count,na.rm=TRUE))
+(var(data_globalLandslide_Guatemala$fatality_count,na.rm=TRUE))
+
+
+(t.test(data_globalLandslide_Guatemala$fatality_count,data_globalLandslide_Japan$fatality_count, alternative = "two.sided", var.equal = FALSE))
+```
+By looking at the mean of X and Y, we can say that although the number of landslides was the same, the mean of fatality count of these two countries is very different, and the alternative hypothesis is true
+
+#### CASE-2
+
+Now, let's take another two countries with same number of landslides - Afghanistan and Nigeria with 15 landslides
+
+
+```{r}
+data_globalLandslide_Afghanistan <- filter(globalLandslide_df,country_name== "Afghanistan")
+data_globalLandslide_Nigeria <- filter(globalLandslide_df, country_name =="Nigeria")
+```
+
+Now, let's perform the T-Test on the injury_count
+
+```{r}
+(mean(data_globalLandslide_Afghanistan$fatality_count,na.rm=TRUE))
+(mean(data_globalLandslide_Nigeria$fatality_count,na.rm=TRUE))
+
+(var(data_globalLandslide_Afghanistan$fatality_count,na.rm=TRUE))
+(var(data_globalLandslide_Nigeria$fatality_count,na.rm=TRUE))
+
+
+(t.test(data_globalLandslide_Afghanistan$fatality_count,data_globalLandslide_Nigeria$fatality_count, alternative = "two.sided", var.equal = FALSE))
+```
+Here, as well there is a big difference on the fatality_count of the two countries
+And the alternative hypothesis is true
+
+### Fitting a Logistic Regression model to predict landslide_size based on Country name and fatality_count
+
+```{r}
+sizeTbl <- table(data_char$landslide_size)
+sizeTbl <- sort(sizeTbl, decreasing = T)
+sizeTbl
+```
+**As we have 3 categories in our landslide_size, we will be using "multinorm"**
+
+```{r}
+require(nnet)
+
+globalLandslide_df$landslide_size <- as.factor(globalLandslide_df$landslide_size)
+
+globalLandslide_df$landslide_size <- relevel(globalLandslide_df$landslide_size, ref = "small")
+
+
+(test <- multinom(landslide_size ~ fatality_count+country_name, data = globalLandslide_df))
+```
+The Residual Deviance here depicts how much the curve cannot fit and is very high.
+
+In this case, our Logistic Regression failed.
+Hence, using the fatality_count and country_name, we were not able to predict the landslide_size as medium and large, keeping small as base
+
+## Summary of findings and questions for further analysis
+
+1. We found the solution to Question-1(What was the landslide's maximum death count so far?) \ We found the answer by plotting the fatality_count and looking at the maximum outlier.
+It could be an erroneous record, but the dataset can also have the correct number, and the death count could be **5000**
+
+2. We found out the solution to Question-2(Are the sizes of various landslides equally distributed in the dataset)\
+No, the dataset is highly skewed towards landslides' "medium" size. The maximum values in the dataset were recorded for the "medium" landslide.
+Hence the various landslide sizes are not equally distributed in the dataset.
+
+3. We found out the solution to Question-3(What are the countries with more than 50 injured recorded in any landslide?) and used a pie-chart above to show the countries with more than 50 people wounded during any global landslide.
+
+4. We found out the solution to Question-4(Is there any correlation between the numerical variable)\
+We only took the fatality_count, injury_count, latitude, and longitude to study the correlation between the numerical variables.
+However, we found no significant correlation between the location(depicted by latitude and longitude) and fatality_count or injury_count.
+We also found a very minimum correlation between the count of injured and demised people.
+
+5. For our Question-5(Perform hypothesis testing to see if the mean of the fatality_count of any two countries with the same number of landslides will be the same or not), we performed a T-test on two sets of countries with the same number of landslides.
+In both cases, we found that the mean value of fatality_count is no match.
+Even if those two countries have the same number of landslides recorded, one of them lost more lives than the other.
+
+6. For our Question-5(Use Logistic Regression to predict the size of the landslide), we used logistic regression to predict the size of the landslide based on the country name and fatality_count.
+But our model failed.
+Hence, we could not predict the size of the landslide and could not build an efficient model using this dataset.
+
+## Conclusion
+
+With this study on the GLC dataset, we could identify some of the relevant queries we could form using this global data.
+And we were also able to find solutions to some of them.
+The result was that the landslide size or the landslide count does not predict the number of deaths. After seeing the records, we also found that so many medium-size landslides cause more fatality after seeing the records. Unfortunately, we could not create a helpful prediction model of the landslide size based on the various countries.
+
+## Limitations
+
+During this project, I realized I kept going back to the materials to clarify my understanding of the extensive dataset analysis. However, I also found that I lack my knowledge of R programming. There were some objectives for which I had to code many lines manually, but I'm sure there are many libraries of R which could make the work simple in one sentence.
+With this project, I also got practical exposure to understanding massive datasets.
+This GLC dataset can be used to create predictive models to identify potential landslide regions and their impact.
